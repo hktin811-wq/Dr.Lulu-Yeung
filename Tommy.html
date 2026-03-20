@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>小助手楊豬 Pro 🐽</title>
+    
+    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkRyLiBMdWx1IFBybyIsCiAgInNob3J0X25hbWUiOiAiRHIuIEx1bHUiLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZjFmMiIsCiAgInRoZW1lX2NvbG9yIjogIiNmNDNmNWUiCn0=">
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: sans-serif; -webkit-tap-highlight-color: transparent; background-color: #fff1f2; overflow-x: hidden; }
+        .drawer-enter-active, .drawer-leave-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .drawer-enter-from, .drawer-leave-to { transform: translateY(100%); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="antialiased text-slate-800">
+    <div id="app" class="max-w-md mx-auto min-h-screen flex flex-col bg-white shadow-2xl relative">
+        
+        <header class="bg-rose-500 text-white p-5 sticky top-0 z-50 flex justify-between items-center shadow-lg pt-12">
+            <div class="flex items-center gap-2">
+                <span class="text-3xl">🐽</span>
+                <div>
+                    <h1 class="font-black text-xl leading-none italic">Dr. Lulu Pro</h1>
+                    <p class="text-[10px] opacity-80 font-bold uppercase tracking-widest">Nurse Handover Tool</p>
+                </div>
+            </div>
+            <button @click="showExport = true" class="bg-rose-700 active:scale-95 px-5 py-2 rounded-2xl text-xs font-black transition-all">匯出報告</button>
+        </header>
+
+        <main class="flex-1 p-4 space-y-6 overflow-y-auto no-scrollbar pb-24">
+            
+            <section>
+                <input v-model="patientNote" type="text" placeholder="輸入病患姓名 / 床號..." class="w-full p-4 bg-rose-50 border-none rounded-2xl text-sm font-bold focus:ring-2 ring-rose-300 shadow-sm">
+            </section>
+
+            <div class="flex bg-rose-100 p-1.5 rounded-2xl shadow-inner">
+                <button @click="view = 'front'" :class="view==='front'?'bg-white text-rose-600 shadow-md':''" class="flex-1 py-3 rounded-xl text-xs font-black transition-all">正面 Front</button>
+                <button @click="view = 'back'" :class="view==='back'?'bg-white text-rose-600 shadow-sm':''" class="flex-1 py-3 rounded-xl text-xs font-black transition-all">背面 Back</button>
+            </div>
+
+            <div class="relative w-full aspect-[3/5] bg-white rounded-[3rem] border-2 border-rose-50 flex items-center justify-center p-6 shadow-xl">
+                <div class="relative h-full aspect-[1/2]">
+                    <svg viewBox="0 0 100 200" class="h-full w-full opacity-40">
+                        <g fill="#FFF5F7" stroke="#FB7185" stroke-width="1.5">
+                            <circle cx="50" cy="20" r="12" />
+                            <path d="M44,31 L56,31 L56,36 L44,36 Z" />
+                            <path d="M35,36 L65,36 L70,55 L68,110 L32,110 L30,55 Z" />
+                            <path d="M65,36 L75,36 L88,60 L92,90 L85,92 L82,65 L70,55" />
+                            <circle cx="92" cy="100" r="6" />
+                            <path d="M35,36 L25,36 L12,60 L8,90 L15,92 L18,65 L30,55" />
+                            <circle cx="8" cy="100" r="6" />
+                            <path d="M50,110 L68,110 L65,150 L63,195 L52,195 L53,150 Z" />
+                            <path d="M50,110 L32,110 L35,150 L37,195 L48,195 L47,150 Z" />
+                        </g>
+                    </svg>
+
+                    <button v-for="part in filteredParts" :key="part.id" @click="selectedPart = part"
+                        :style="{ left: part.x, top: part.y }"
+                        class="absolute -translate-x-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center z-10 active:scale-150 transition-transform">
+                        <div :class="selectedPart?.id === part.id ? 'bg-rose-500 scale-150 ring-4 ring-rose-100' : 'bg-rose-400'" class="w-4 h-4 rounded-full shadow-lg"></div>
+                    </button>
+                </div>
+            </div>
+
+            <section class="bg-white p-5 rounded-3xl border border-rose-100 shadow-lg">
+                <h3 class="text-[11px] font-black text-rose-400 uppercase tracking-[0.2em] mb-4">● 既往病史 History</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <button v-for="h in historyList" :key="h.id" @click="toggleHistory(h)"
+                        :class="hasHistory(h.id)?'bg-rose-500 text-white shadow-md':'bg-rose-50 text-rose-300'"
+                        class="py-3 rounded-xl text-[11px] font-black transition-all">
+                        {{h.name}}
+                    </button>
+                </div>
+            </section>
+
+            <section class="bg-white p-5 rounded-3xl border border-rose-100 shadow-lg space-y-4">
+                <h3 class="text-[11px] font-black text-rose-400 uppercase tracking-[0.2em]">● 自動生成描述 Summary</h3>
+                <div class="p-4 bg-rose-50/50 rounded-2xl border-l-4 border-rose-400">
+                    <p class="text-sm font-black text-slate-700 leading-relaxed italic">「 {{summaryZH}} 」</p>
+                </div>
+                <div class="p-4 bg-blue-50/50 rounded-2xl border-l-4 border-blue-400">
+                    <p class="text-[12px] font-bold text-slate-600 leading-relaxed italic">" {{summaryEN}} "</p>
+                </div>
+            </section>
+
+            <div class="space-y-3">
+                <div v-for="(rec, i) in records" :key="i" class="bg-rose-50/50 p-4 rounded-2xl flex justify-between items-center border border-rose-100 animate-in fade-in slide-in-from-bottom-2">
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-xl bg-rose-200 text-rose-600 flex items-center justify-center text-xs font-black italic">{{i+1}}</span>
+                        <span class="text-sm font-black text-slate-700">{{rec.partName}}{{rec.injName}}</span>
+                    </div>
+                    <button @click="records.splice(i,1)" class="text-rose-300 p-2 text-xl">✕</button>
+                </div>
+            </div>
+        </main>
+
+        <transition name="drawer">
+            <div v-if="selectedPart" class="fixed inset-0 z-[60] flex flex-col justify-end bg-black/40 backdrop-blur-sm" @click.self="selectedPart = null">
+                <div class="bg-white rounded-t-[3rem] p-8 space-y-6 shadow-2xl pb-16">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-[10px] font-black text-rose-300 uppercase tracking-widest">Adding condition to</p>
+                            <h3 class="text-3xl font-black text-rose-600">{{selectedPart.name}} <span class="text-lg opacity-30 italic">{{selectedPart.en}}</span></h3>
+                        </div>
+                        <button @click="selectedPart = null" class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-xl">✕</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button v-for="inj in injuries" :key="inj.name" @click="addRecord(inj)" 
+                            class="bg-rose-500 active:bg-rose-800 text-white py-5 rounded-2xl font-black text-sm shadow-lg transition-all flex flex-col items-center">
+                            {{inj.name}}
+                            <span class="text-[9px] opacity-60 uppercase mt-1">{{inj.en}}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <div v-if="showExport" class="fixed inset-0 bg-white z-[100] p-8 flex flex-col">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black italic text-rose-600">Report 🏥</h2>
+                <button @click="showExport = false" class="text-3xl p-2 font-bold">✕</button>
+            </div>
+            <textarea readonly class="flex-1 w-full bg-slate-50 p-6 rounded-3xl font-mono text-sm border-none shadow-inner mb-8 focus:ring-0 leading-loose">{{fullReport}}</textarea>
+            <button @click="copyAll" class="w-full bg-rose-600 text-white py-6 rounded-3xl font-black text-xl shadow-2xl mb-6 active:scale-95 transition-all">複製報告內容</button>
+            <p class="text-center text-[10px] text-rose-300 font-bold uppercase tracking-[0.5em]">Dr. Lulu Assistant v5.0 Final</p>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed } = Vue;
+        createApp({
+            setup() {
+                const view = ref('front');
+                const selectedPart = ref(null);
+                const records = ref([]);
+                const history = ref([]);
+                const patientNote = ref("");
+                const showExport = ref(false);
+
+                const parts = [
+                    { id: 'h', name: '頭部', en: 'Head', x: '50%', y: '10%', side: 'front' },
+                    { id: 'n', name: '頸部', en: 'Neck', x: '50%', y: '18%', side: 'front' },
+                    { id: 'ls', name: '左肩', en: 'L Shoulder', x: '68%', y: '23%', side: 'front' },
+                    { id: 'rs', name: '右肩', en: 'R Shoulder', x: '32%', y: '23%', side: 'front' },
+                    { id: 'lc', name: '左胸', en: 'L Chest', x: '63%', y: '32%', side: 'front' },
+                    { id: 'rc', name: '右胸', en: 'R Chest', x: '37%', y: '32%', side: 'front' },
+                    { id: 'ab', name: '腹部', en: 'Abdomen', x: '50%', y: '45%', side: 'front' },
+                    { id: 'la', name: '左臂', en: 'L Arm', x: '82%', y: '45%', side: 'front' },
+                    { id: 'ra', name: '右臂', en: 'R Arm', x: '18%', y: '45%', side: 'front' },
+                    { id: 'lh', name: '左手', en: 'L Hand', x: '92%', y: '64%', side: 'front' },
+                    { id: 'rh', name: '右手', en: 'R Hand', x: '8%', y: '64%', side: 'front' },
+                    { id: 'lt', name: '左大腿', en: 'L Thigh', x: '58%', y: '68%', side: 'front' },
+                    { id: 'rt', name: '右大腿', en: 'R Thigh', x: '42%', y: '68%', side: 'front' },
+                    { id: 'lk', name: '左膝', en: 'L Knee', x: '58%', y: '80%', side: 'front' },
+                    { id: 'rk', name: '右膝', en: 'R Knee', x: '42%', y: '80%', side: 'front' },
+                    { id: 'lf', name: '左腳', en: 'L Foot', x: '58%', y: '95%', side: 'front' },
+                    { id: 'rf', name: '右腳', en: 'R Foot', x: '42%', y: '95%', side: 'front' },
+                    // 背面部位
+                    { id: 'bh', name: '後腦', en: 'Back of Head', x: '50%', y: '10%', side: 'back' },
+                    { id: 'bb', name: '背部', en: 'Back', x: '50%', y: '35%', side: 'back' },
+                    { id: 'bw', name: '腰部', en: 'Waist', x: '50%', y: '50%', side: 'back' },
+                    { id: 'bp', name: '臀部', en: 'Hip', x: '50%', y: '58%', side: 'back' },
+                    { id: 'bl', name: '左腿後', en: 'L Leg(B)', x: '58%', y: '75%', side: 'back' },
+                    { id: 'br', name: '右腿後', en: 'R Leg(B)', x: '42%', y: '75%', side: 'back' }
+                ];
+
+                const injuries = [
+                    { name: '出血', en: 'Bleeding' }, { name: '骨折', en: 'Fracture' }, 
+                    { name: '腫痛', en: 'Swelling' }, { name: '瘀青', en: 'Bruising' },
+                    { name: '裂傷', en: 'Laceration' }, { name: '燒燙傷', en: 'Burn' },
+                    { name: '畸形', en: 'Deformity' }, { name: '麻痺', en: 'Numbness' }
+                ];
+
+                const historyList = [
+                    { id: 'htn', name: '高血壓', en: 'HTN' }, { id: 'dm', name: '糖尿病', en: 'DM' },
+                    { id: 'hlp', name: '高血脂', en: 'HLP' }, { id: 'heart', name: '心臟病', en: 'Heart Dis.' },
+                    { id: 'asthma', name: '哮喘', en: 'Asthma' }, { id: 'stroke', name: '中風', en: 'Stroke' }
+                ];
+
+                const filteredParts = computed(() => parts.filter(p => p.side === view.value));
+
+                const addRecord = (inj) => {
+                    records.value.push({ 
+                        partName: selectedPart.value.name, partEn: selectedPart.value.en,
+                        injName: inj.name, injEn: inj.en
+                    });
+                    selectedPart.value = null;
+                };
+
+                const toggleHistory = (h) => {
+                    const idx = history.value.findIndex(item => item.id === h.id);
+                    if (idx > -1) history.value.splice(idx, 1);
+                    else history.value.push(h);
+                };
+                const hasHistory = (id) => history.value.some(h => h.id === id);
+
+                const summaryZH = computed(() => {
+                    let res = "";
+                    if (history.value.length > 0) res += `病患有 ${history.value.map(h => h.name).join('、')} 病史。`;
+                    if (records.value.length > 0) res += `目前觀察到 ${records.value.map(r => r.partName + r.injName).join('、')}。`;
+                    return res || "暫無紀錄內容。";
+                });
+
+                const summaryEN = computed(() => {
+                    let res = "";
+                    if (history.value.length > 0) res += `Patient has history of ${history.value.map(h => h.en).join(', ')}. `;
+                    if (records.value.length > 0) res += `Observed ${records.value.map(r => r.injEn + " on " + r.partEn).join(', ')}.`;
+                    return res || "No records.";
+                });
+
+                const fullReport = computed(() => {
+                    const time = new Date().toLocaleString();
+                    let text = `【小助手楊豬 Pro 醫護報告】🐽\n時間: ${time}\n病患: ${patientNote.value || '未填寫'}\n\n【綜合描述】\n${summaryZH.value}\n${summaryEN.value}\n\n【詳細傷情】\n`;
+                    records.value.forEach((r, i) => { text += `${i+1}. ${r.partName}${r.injName} (${r.injEn} on ${r.partEn})\n`; });
+                    if(history.value.length > 0) text += `\n【既往病史】\n` + history.value.map(h => `• ${h.name} (${h.en})`).join('\n');
+                    return text;
+                });
+
+                const copyAll = () => {
+                    navigator.clipboard.writeText(fullReport.value);
+                    alert("報告已複製到剪貼簿！🐽");
+                };
+
+                return { view, selectedPart, records, history, patientNote, showExport, filteredParts, injuries, historyList, addRecord, toggleHistory, hasHistory, summaryZH, summaryEN, fullReport, copyAll };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
